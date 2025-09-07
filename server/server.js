@@ -22,8 +22,19 @@ const otpRoutes = require('./routes/otpRoutes');
 
 // middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3101'],
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:5174', 
+    'http://localhost:3101',
+    'https://vj-hostels-student-client.vercel.app',
+    'https://vj-hostels-admin-client.vercel.app',
+    'https://vj-hostels-security-client.vercel.app',
+  ],
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 600 // Increase preflight cache to 10 minutes
 }));
 
 // body parser middleware
@@ -155,6 +166,8 @@ server.listen(port, () => {
 
 // error handler
 app.use((err,req,res,next)=>{
-    console.log("err object in express error handler :",err)
-    res.send({message:err.message})
+    res.header('Access-Control-Allow-Origin', req.headers.origin);
+    res.header('Access-Control-Allow-Credentials', true);
+    console.log("err object in express error handler:", err);
+    res.send({message: err.message});
 })
