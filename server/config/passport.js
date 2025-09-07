@@ -3,11 +3,19 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const Student = require('../models/StudentModel.js');
 const Admin = require('../models/AdminModel.js');
 
+// Helper to get base URL based on environment
+const getBaseUrl = () => {
+    return process.env.NODE_ENV === 'production' 
+        ? process.env.PROD_SERVER_URL 
+        : process.env.SERVER_URL;
+};
+
 // Student Google OAuth
 passport.use('google-student', new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: `${process.env.SERVER_URL}/auth/student/callback`,
+    callbackURL: `${getBaseUrl()}${process.env.GOOGLE_STUDENT_CALLBACK_URL}`,
+    proxy: true
 }, async (accessToken, refreshToken, profile, done) => {
     try {
         const email = profile.emails[0].value;
@@ -35,12 +43,12 @@ passport.use('google-student', new GoogleStrategy({
     }
 }));
 
-
 // Admin Google OAuth
 passport.use('google-admin', new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: `${process.env.SERVER_URL}/auth/admin/callback`,
+    callbackURL: `${getBaseUrl()}${process.env.GOOGLE_ADMIN_CALLBACK_URL}`,
+    proxy: true
 }, async (accessToken, refreshToken, profile, done) => {
     try {
         const email = profile.emails[0].value;
@@ -64,7 +72,6 @@ passport.use('google-admin', new GoogleStrategy({
         return done(err, null);
     }
 }));
-
 
 passport.serializeUser((user, done) => {
   done(null, { id: user.id, role: user.role || 'student' }); 

@@ -17,6 +17,18 @@ function generateJwt(user) {
   );
 }
 
+// Helper to get client URL based on environment
+const getClientUrl = () => {
+    return process.env.NODE_ENV === 'production' 
+        ? process.env.PROD_CLIENT_URL 
+        : process.env.CLIENT_URL;
+};
+
+const getAdminClientUrl = () => {
+    return process.env.NODE_ENV === 'production' 
+        ? process.env.PROD_ADMIN_CLIENT_URL 
+        : process.env.ADMIN_CLIENT_URL;
+};
 
 // Student Google OAuth
 router.get('/google', 
@@ -29,30 +41,29 @@ router.get(
     passport.authenticate('google-student', (err, user, info) => {
       if (err) {
         console.error("Authentication error:", err);
-        return res.redirect(`${process.env.CLIENT_URL}/login?error=auth_failed`);
+        return res.redirect(`${getClientUrl()}/login?error=auth_failed`);
       }
 
       if (!user) {
         console.log("No user found or unauthorized email");
-        return res.redirect(`${process.env.CLIENT_URL}/login?error=unauthorized`);
+        return res.redirect(`${getClientUrl()}/login?error=unauthorized`);
       }
 
       req.logIn(user, (err) => {
         if (err) {
           console.error("Login error:", err);
-          return res.redirect(`${process.env.CLIENT_URL}/login?error=login_failed`);
+          return res.redirect(`${getClientUrl()}/login?error=login_failed`);
         }
 
         console.log("Successful login for user:", user);
         const token = generateJwt(user);
 
         // Redirect with token as URL parameter for frontend to handle
-        return res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${token}`);
+        return res.redirect(`${getClientUrl()}/auth/callback?token=${token}`);
       });
     })(req, res, next);
   }
 );
-
 
 // Admin Google OAuth
 router.get('/google/admin', 
@@ -65,25 +76,25 @@ router.get(
     passport.authenticate('google-admin', (err, user, info) => {
       if (err) {
         console.error("Admin authentication error:", err);
-        return res.redirect(`${process.env.ADMIN_CLIENT_URL || 'http://localhost:5174'}/login?error=auth_failed`);
+        return res.redirect(`${getAdminClientUrl()}/login?error=auth_failed`);
       }
 
       if (!user) {
         console.log("No admin user found or unauthorized email");
-        return res.redirect(`${process.env.ADMIN_CLIENT_URL || 'http://localhost:5174'}/login?error=unauthorized`);
+        return res.redirect(`${getAdminClientUrl()}/login?error=unauthorized`);
       }
 
       req.logIn(user, (err) => {
         if (err) {
           console.error("Admin login error:", err);
-          return res.redirect(`${process.env.ADMIN_CLIENT_URL || 'http://localhost:5174'}/login?error=login_failed`);
+          return res.redirect(`${getAdminClientUrl()}/login?error=login_failed`);
         }
 
         console.log("Successful admin login for user:", user);
         const token = generateJwt(user);
 
         // Redirect with token and admin email as URL parameters for frontend to handle
-        return res.redirect(`${process.env.ADMIN_CLIENT_URL || 'http://localhost:5174'}/auth/callback?token=${token}&admin=${encodeURIComponent(user.email)}`);
+        return res.redirect(`${getAdminClientUrl()}/auth/callback?token=${token}&admin=${encodeURIComponent(user.email)}`);
       });
     })(req, res, next);
   }
