@@ -10,20 +10,27 @@ const getBaseUrl = () => {
         : process.env.SERVER_URL;
 };
 
+// Helper to validate institutional email
+const isInstitutionalEmail = (email) => {
+    return email.toLowerCase().endsWith('@vnrvjiet.in');
+};
+
 // Student Google OAuth
 passport.use('google-student', new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackURL: `${getBaseUrl()}${process.env.GOOGLE_STUDENT_CALLBACK_URL}`,
-    proxy: true
+    proxy: true,
+    userProfileURL: 'https://www.googleapis.com/oauth2/v3/userinfo'
 }, async (accessToken, refreshToken, profile, done) => {
     try {
         const email = profile.emails[0].value;
-        if (!email.endsWith('@vnrvjiet.in')) {
-            return done(null, false, { message: 'Only institutional emails allowed' });
+        if (!isInstitutionalEmail(email)) {
+            console.log('Invalid email domain:', email);
+            return done(null, false, { message: 'Only @vnrvjiet.in email addresses are allowed' });
         }
 
-        let student = await Student.findOne({ googleId: profile.id });
+        let student = await Student.findOne({ email }); // Changed to find by email instead of googleId
         if (!student) {
             student = await Student.create({
                 googleId: profile.id,
@@ -31,14 +38,16 @@ passport.use('google-student', new GoogleStrategy({
                 name: profile.displayName,
                 email: email,
                 password: 'N/A',
-                rollNumber: 'N/A',
+                rollNumber: email.split('@')[0], // Extract roll number from email
                 phoneNumber: 'N/A',
                 parentMobileNumber: 'N/A',
+                is_active: true
             });
         }
 
         return done(null, student);
     } catch (err) {
+        console.error('Google OAuth Error:', err);
         return done(err, null);
     }
 }));

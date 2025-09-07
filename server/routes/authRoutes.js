@@ -30,40 +30,46 @@ const getAdminClientUrl = () => {
         : process.env.ADMIN_CLIENT_URL;
 };
 
-// Student Google OAuth
-router.get('/google', 
-    passport.authenticate('google-student', { scope: ['profile', 'email'] })
-);
+// Student Google OAuth with improved error handling
+router.get('/google', (req, res, next) => {
+  const returnTo = req.query.returnTo || '/';
+  req.session.returnTo = returnTo;
+  
+  passport.authenticate('google-student', {
+    scope: ['profile', 'email'],
+    hostedDomain: 'vnrvjiet.in', // Restrict to institutional domain
+    prompt: 'select_account' // Always show account selector
+  })(req, res, next);
+});
 
-router.get(
-  '/student/callback',
-  (req, res, next) => {
-    passport.authenticate('google-student', (err, user, info) => {
+router.get('/student/callback', (req, res, next) => {
+  passport.authenticate('google-student', (err, user, info) => {
+    const clientUrl = getClientUrl();
+    
+    if (err) {
+      console.error("Authentication error:", err);
+      return res.redirect(`${clientUrl}/login?error=auth_failed&message=${encodeURIComponent(err.message)}`);
+    }
+
+    if (!user) {
+      console.log("Auth failed:", info?.message || 'Unknown reason');
+      return res.redirect(`${clientUrl}/login?error=unauthorized&message=${encodeURIComponent(info?.message || 'Only @vnrvjiet.in emails are allowed')}`);
+    }
+
+    req.logIn(user, (err) => {
       if (err) {
-        console.error("Authentication error:", err);
-        return res.redirect(`${getClientUrl()}/login?error=auth_failed`);
+        console.error("Login error:", err);
+        return res.redirect(`${clientUrl}/login?error=login_failed`);
       }
 
-      if (!user) {
-        console.log("No user found or unauthorized email");
-        return res.redirect(`${getClientUrl()}/login?error=unauthorized`);
-      }
+      const token = generateJwt(user);
+      const returnTo = req.session.returnTo || '/';
+      delete req.session.returnTo;
 
-      req.logIn(user, (err) => {
-        if (err) {
-          console.error("Login error:", err);
-          return res.redirect(`${getClientUrl()}/login?error=login_failed`);
-        }
-
-        console.log("Successful login for user:", user);
-        const token = generateJwt(user);
-
-        // Redirect with token as URL parameter for frontend to handle
-        return res.redirect(`${getClientUrl()}/auth/callback?token=${token}`);
-      });
-    })(req, res, next);
-  }
-);
+      return res.redirect(`${clientUrl}/auth/callback?token=${token}&returnTo=${encodeURIComponent(returnTo)}`);
+    });
+  })(req, res, next);
+});
 
 // Admin Google OAuth
 router.get('/google/admin', 
