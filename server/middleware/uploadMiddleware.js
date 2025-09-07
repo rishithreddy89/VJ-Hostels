@@ -2,8 +2,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Use /tmp for Lambda environments, fall back to local path for development
-const baseUploadDir = process.env.AWS_LAMBDA_FUNCTION_NAME
+// Use /tmp for serverless environments (Vercel/Lambda), fall back to local path for development
+const baseUploadDir = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
   ? '/tmp/uploads'
   : path.join(__dirname, '../uploads');
 
@@ -12,10 +12,17 @@ const createDirIfNotExists = (dirPath) => {
   try {
     if (!fs.existsSync(dirPath)) {
       fs.mkdirSync(dirPath, { recursive: true });
+      // Set proper permissions for /tmp directories in serverless environment
+      if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+        fs.chmodSync(dirPath, 0o777);
+      }
     }
   } catch (error) {
     console.error(`Error creating directory ${dirPath}:`, error);
-    throw new Error('Failed to create upload directory');
+    // Don't throw error in production, just log it
+    if (process.env.NODE_ENV === 'development') {
+      throw new Error('Failed to create upload directory');
+    }
   }
 };
 

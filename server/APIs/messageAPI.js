@@ -6,10 +6,23 @@ const { uploadMessageImage } = require('../middleware/uploadMiddleware');
 const path = require('path');
 const fs = require('fs');
 
+// Use /tmp for serverless environments (Vercel/Lambda), fall back to local path for development
+const messageUploadsDir = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
+  ? '/tmp/uploads/messages'
+  : path.join(__dirname, '../uploads/messages');
+
 // Create uploads directory for message images if it doesn't exist
-const messageUploadsDir = path.join(__dirname, '../uploads/messages');
-if (!fs.existsSync(messageUploadsDir)) {
+try {
+  if (!fs.existsSync(messageUploadsDir)) {
     fs.mkdirSync(messageUploadsDir, { recursive: true });
+    // Set proper permissions for /tmp directories in serverless environment
+    if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      fs.chmodSync(messageUploadsDir, 0o777);
+    }
+  }
+} catch (error) {
+  console.error('Error creating message uploads directory:', error);
+  // Don't throw error in production, just log it
 }
 
 // Get all messages
