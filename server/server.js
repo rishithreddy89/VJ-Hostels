@@ -20,16 +20,28 @@ const adminVisitorApp = require('./APIs/adminVisitorAPI');
 const otpRoutes = require('./routes/otpRoutes');
 // const complaintApp = require('./APIs/complaintAPI');
 
+// Trust proxy - required for secure cookies and proper OAuth behind proxy
+app.enable('trust proxy');
+
+// Get environment-specific domain
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:3101',
+  'https://vj-hostels.vercel.app',
+  'https://vj-hostels-admin.vercel.app',
+  'https://vj-hostels-security-client.vercel.app',
+];
+
 // middleware
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:5174', 
-    'http://localhost:3101',
-    'https://vj-hostels-student-client.vercel.app',
-    'https://vj-hostels-admin-client.vercel.app',
-    'https://vj-hostels-security-client.vercel.app',
-  ],
+  origin: function(origin, callback) {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -46,8 +58,15 @@ app.use('/uploads', exp.static('uploads'));
 app.use(session({
     secret: process.env.JWT_SECRET,
     resave: false,
-    saveUninitialized: false
-}))
+    saveUninitialized: false,
+    proxy: true, // Required for Vercel proxy
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined,
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+}));
 
 app.use(passport.initialize());
 app.use(passport.session());

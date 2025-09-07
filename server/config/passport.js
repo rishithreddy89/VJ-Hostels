@@ -21,28 +21,45 @@ passport.use('google-student', new GoogleStrategy({
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackURL: `${getBaseUrl()}${process.env.GOOGLE_STUDENT_CALLBACK_URL}`,
     proxy: true,
-    userProfileURL: 'https://www.googleapis.com/oauth2/v3/userinfo'
-}, async (accessToken, refreshToken, profile, done) => {
+    userProfileURL: 'https://www.googleapis.com/oauth2/v3/userinfo',
+    passReqToCallback: true
+}, async (req, accessToken, refreshToken, profile, done) => {
     try {
+        console.log('Profile:', profile); // Debug log
         const email = profile.emails[0].value;
-        if (!isInstitutionalEmail(email)) {
+        
+        if (!email.toLowerCase().endsWith('@vnrvjiet.in')) {
             console.log('Invalid email domain:', email);
             return done(null, false, { message: 'Only @vnrvjiet.in email addresses are allowed' });
         }
 
-        let student = await Student.findOne({ email }); // Changed to find by email instead of googleId
+        // Try to find student by email first
+        let student = await Student.findOne({ email: email });
         if (!student) {
+            student = await Student.findOne({ googleId: profile.id });
+        }
+
+        if (!student) {
+            const rollNumber = email.split('@')[0];
             student = await Student.create({
                 googleId: profile.id,
                 username: profile.displayName,
                 name: profile.displayName,
                 email: email,
                 password: 'N/A',
-                rollNumber: email.split('@')[0], // Extract roll number from email
+                rollNumber: rollNumber,
                 phoneNumber: 'N/A',
                 parentMobileNumber: 'N/A',
                 is_active: true
             });
+            console.log('Created new student:', student);
+        } else {
+            // Update googleId if not set
+            if (!student.googleId) {
+                student.googleId = profile.id;
+                await student.save();
+            }
+            console.log('Found existing student:', student);
         }
 
         return done(null, student);
