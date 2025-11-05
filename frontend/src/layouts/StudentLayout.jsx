@@ -18,15 +18,18 @@ function StudentLayout() {
 
   const isAnnouncementsPage = location.pathname.includes('/announcements')
 
-  const handleLogout = async () => {
-    try {
-      await logout()
-      clearUser()
-      window.location.href = '/login'
-    } catch (error) {
-      console.error('Logout error:', error)
-      window.location.href = '/login'
-    }
+  const handleLogout = () => {
+    // Clear state immediately
+    clearUser()
+    localStorage.removeItem('token')
+    localStorage.removeItem('auth-token')
+    localStorage.removeItem('guard_token')
+    
+    // Redirect immediately
+    window.location.href = '/login'
+    
+    // Call logout API in background (non-blocking)
+    logout().catch(() => {})
   }
 
   useEffect(() => {
@@ -117,36 +120,38 @@ function StudentLayout() {
           </div>
         )}
 
-        {/* Logout button */}
-        <button
-          aria-label="Logout"
-          title="Logout"
-          onClick={handleLogout}
-          style={{
-            backgroundColor: 'white',
-            color: '#4F46E5',
-            borderRadius: '999px',
-            width: '38px',
-            height: '38px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: 'none',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#f3e8e8'
-            e.currentTarget.style.transform = 'translateY(-2px)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'white'
-            e.currentTarget.style.transform = 'none'
-          }}
-        >
-          <LogOut size={18} />
-        </button>
+        {/* Logout button - hidden on mobile */}
+        {!isMobile && (
+          <button
+            aria-label="Logout"
+            title="Logout"
+            onClick={handleLogout}
+            style={{
+              backgroundColor: 'white',
+              color: '#4F46E5',
+              borderRadius: '999px',
+              width: '38px',
+              height: '38px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3e8e8'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'white'
+              e.currentTarget.style.transform = 'none'
+            }}
+          >
+            <LogOut size={18} />
+          </button>
+        )}
       </nav>
 
       {/* Mobile Sidebar */}
@@ -173,17 +178,19 @@ function StudentLayout() {
           <aside
             style={{
               position: 'fixed',
-              top: 0,
-              left: 0,
-              height: '100vh',
-              width: 'min(320px, 75%)',
+              top: '20px',
+              left: '20px',
+              height: 'calc(100vh - 40px)',
+              width: 'min(320px, calc(75% - 20px))',
               backgroundColor: '#4F46E5',
               color: 'white',
-              boxShadow: '0 10px 25px -3px rgba(0, 0, 0, 0.1)',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
               zIndex: 1000,
-              transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
-              transition: 'transform 0.3s ease-in-out',
-              overflowY: 'auto',
+              transform: sidebarOpen ? 'translateX(0)' : 'translateX(-120%)',
+              transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              overflow: 'hidden',
+              borderRadius: '24px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
             }}
             aria-hidden={!sidebarOpen}
           >
@@ -192,9 +199,11 @@ function StudentLayout() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '1rem',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
-                backgroundColor: '#1E3A8A',
+                padding: '1.25rem 1rem',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+                backgroundColor: '#3730A3',
+                borderTopLeftRadius: '24px',
+                borderTopRightRadius: '24px',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -207,19 +216,29 @@ function StudentLayout() {
               <button
                 onClick={toggleSidebar}
                 style={{
-                  backgroundColor: 'transparent',
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
                   border: 'none',
                   color: 'white',
                   cursor: 'pointer',
                   padding: '0.5rem',
-                  borderRadius: '0.375rem',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'
                 }}
                 aria-label="Close sidebar"
               >
                 <X size={24} />
               </button>
             </div>
-            <div style={{ padding: 0, height: 'calc(100vh - 80px)', overflowY: 'auto' }}>
+            <div style={{ padding: '0.75rem 0', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <Navbar onNavigate={closeSidebar} isDesktop={false} isInSidebar={true} />
             </div>
           </aside>
