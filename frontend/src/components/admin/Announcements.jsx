@@ -99,13 +99,29 @@ const Announcements = () => {
             // Use FormData to support optional image upload
             const payload = new FormData();
             payload.append('title', formData.title);
-            // Store actual newlines as the two-character sequence "\\n"
-            const encodeNewlinesForStorage = (s) => {
-                if (typeof s !== 'string') return s ?? '';
-                return s.replace(/\r\n|\r|\n/g, '\\n');
+            // Preprocess description before storage:
+            // - normalize newlines to \n
+            // - remove trailing empty lines (user pressed enter at the end)
+            // - remove trailing spaces at end of each line
+            // - finally encode newlines as the two-character sequence "\\n"
+            const preprocessDescriptionForStorage = (s) => {
+                if (typeof s !== 'string') return '';
+                // normalize to LF
+                const normalized = s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                const lines = normalized.split('\n');
+                // remove trailing empty lines
+                while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+                    lines.pop();
+                }
+                // rtrim each line
+                for (let i = 0; i < lines.length; i++) {
+                    lines[i] = lines[i].replace(/\s+$/g, '');
+                }
+                const cleaned = lines.join('\n');
+                return cleaned.replace(/\n/g, '\\n');
             };
 
-            payload.append('description', encodeNewlinesForStorage(formData.description));
+            payload.append('description', preprocessDescriptionForStorage(formData.description));
             if (imageFile) payload.append('image', imageFile);
 
             if (editingId) {
