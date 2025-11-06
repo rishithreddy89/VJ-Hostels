@@ -576,7 +576,6 @@ const Food = () => {
                         style={{
                             padding: '0.5rem 1rem',
                             borderRadius: '8px',
-                            border: 'none',
                             fontSize: '0.8rem',
                             fontWeight: '500',
                             cursor: 'pointer',
@@ -599,7 +598,6 @@ const Food = () => {
                         style={{
                             padding: '0.5rem 1rem',
                             borderRadius: '8px',
-                            border: 'none',
                             fontSize: '0.8rem',
                             fontWeight: '500',
                             cursor: 'pointer',
@@ -622,7 +620,6 @@ const Food = () => {
                         style={{
                             padding: '0.5rem 1rem',
                             borderRadius: '8px',
-                            border: 'none',
                             fontSize: '0.8rem',
                             fontWeight: '500',
                             cursor: 'pointer',
