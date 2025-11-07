@@ -144,12 +144,6 @@ const QRScanner = () => {
                 { qrCodeData: scanResult }
             );
 
-            const time = detectedAction === 'out' ? response.data.student.outTime : response.data.student.inTime;
-            
-            // Use a better, more modern confirmation UI instead of native alert if possible, 
-            // but for this example, keeping the logic simple with alert as per original code.
-            alert(`✅ ${response.data.message}\n\nStudent: ${response.data.student.name}\nTime: ${new Date(time).toLocaleString()}`);
-            
             resetScanner();
         } catch (err) {
             console.error(`Error during ${detectedAction}:`, err);
@@ -258,10 +252,10 @@ const QRScanner = () => {
                     style={{
                         backgroundColor: '#fff',
                         borderRadius: '16px',
-                        padding: '1.5rem',
-                        maxWidth: '420px',
-                        width: '100%',
-                        maxHeight: '85vh',
+                        padding: '2rem',
+                        maxWidth: '550px',
+                        width: '95%',
+                        maxHeight: '90vh',
                         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
                         animation: 'slideUp 0.4s ease-out',
                         position: 'relative',
@@ -544,18 +538,23 @@ const QRScanner = () => {
                     <div 
                         ref={scannerRef}
                         id="qr-reader"
-                        style={{ 
-                            border: scanning ? '3px solid #4CAF50' : '3px solid #ddd', 
-                            borderRadius: '12px', 
+                        style={{
+                            position: 'relative',
+                            borderRadius: '16px',
                             overflow: 'hidden',
                             width: '100%',
-                            // Max width is important for mobile view
-                            maxWidth: '500px', 
+                            maxWidth: '450px',
+                            aspectRatio: '1 / 1',
                             margin: '0 auto',
-                            position: 'relative'
+                            backgroundColor: '#000',
+                            boxShadow: scanning
+                                ? '0 0 20px rgba(76, 175, 80, 0.7)'
+                                : '0 0 10px rgba(0,0,0,0.3)',
+                            border: scanning ? '3px solid #4CAF50' : '3px solid #333',
                         }}
                     >
                     </div>
+
                     
                     {/* Status/Feedback section */}
                     {!scanning && !error && (verifiedPass || isVerifying) && (
@@ -847,9 +846,11 @@ const QRScanner = () => {
                 @media (max-width: 480px) {
                     .overlay-card {
                         margin: 10px !important;
-                        padding: 1rem !important;
-                        max-height: 80vh !important;
+                        padding: 2rem !important;
+                        max-height: 92vh !important;
                         border-radius: 12px !important;
+                        max-width: 95vw !important;
+                        width: 95vw !important;
                     }
                 }
                 

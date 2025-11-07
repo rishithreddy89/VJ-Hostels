@@ -54,7 +54,7 @@ const SecurityLayout = () => {
           top: '20px',
           left: '50%',
           transform: 'translateX(-50%)',
-          backgroundColor: '#1E40AF',
+          backgroundColor: 'rgba(30, 64, 175, 0.95)',
           color: 'white',
           borderRadius: '9999px',
           padding: '0.5rem 1.25rem',
@@ -66,7 +66,7 @@ const SecurityLayout = () => {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          zIndex: 50,
+          zIndex: 1000,
           backdropFilter: 'blur(10px)',
           WebkitBackdropFilter: 'blur(10px)',
           border: '1px solid rgba(255,255,255,0.08)',
@@ -250,8 +250,6 @@ const SecurityLayout = () => {
           padding: '0rem',
           backgroundColor: '#f9fafb',
           minHeight: '100vh',
-          position: 'relative',
-          zIndex: 1,
         }}
       >
         <div

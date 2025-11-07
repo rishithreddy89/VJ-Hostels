@@ -1,13 +1,25 @@
 import React, { useState, useEffect } from 'react';
+import { X, Search, Shield, Clock, AlertCircle } from 'lucide-react';
 import { otpAPI, studentAPI, overrideAPI } from '../../securityServices/api';
 import socketService from '../../securityServices/socket';
 import { useAuth } from '../../context/SecurityContext';
-import './VisitorManagement.css';
+
+/**
+ * Guard.jsx
+ * Single-file component combining:
+ * - Your real logic (APIs + socket + useAuth)
+ * - The modern inline-style UI (lucide icons) you liked
+ *
+ * Notes:
+ * - Uses inline CSS (as requested)
+ * - Assumes lucide-react is installed
+ * - Assumes otpAPI, studentAPI, overrideAPI, socketService and useAuth are available
+ */
 
 const Guard = () => {
   const { user, logout } = useAuth();
 
-  const [currentView, setCurrentView] = useState('search'); // search, otp, visits, verify
+  const [currentView, setCurrentView] = useState('search'); // search, verify, visits
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -17,7 +29,7 @@ const Guard = () => {
     purpose: '',
     groupSize: 1
   });
-  const [otpStatus, setOtpStatus] = useState(null); // null, 'sent', 'verified', 'expired', 'failed'
+  const [otpStatus, setOtpStatus] = useState(null); // null, 'sent', 'verified', 'expired', 'failed', 'out_of_hours', 'override_requested'
   const [activeVisits, setActiveVisits] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -26,6 +38,7 @@ const Guard = () => {
     otp: ''
   });
 
+  // --- lifecycle & sockets ---
   useEffect(() => {
     socketService.connect();
 
@@ -42,15 +55,17 @@ const Guard = () => {
       socketService.off('visitCreated', handleVisitCreated);
       socketService.off('visitCheckedOut', handleVisitCheckedOut);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const handleOtpVerified = (data) => {
+    // data might contain visit info; for UI purposes we set verified and refresh
     setOtpStatus('verified');
     loadActiveVisits();
     setTimeout(() => {
       setCurrentView('visits');
       resetForm();
-    }, 2000);
+    }, 1200);
   };
 
   const handleVisitCreated = (data) => {
@@ -61,21 +76,25 @@ const Guard = () => {
     loadActiveVisits();
   };
 
+  // --- API calls ---
   const loadActiveVisits = async () => {
     try {
       const guardId = user?._id || user?.id;
       if (!guardId) {
         setError('Authentication error: Guard ID missing');
+        setActiveVisits([]);
         return;
       }
       const response = await otpAPI.getActiveVisits(guardId);
       setActiveVisits(response.data.visits || []);
-    } catch (error) {
-      setError(`Failed to load visits: ${error.message}`);
+    } catch (err) {
+      console.error('loadActiveVisits error', err);
+      setError(`Failed to load visits: ${err.message || 'Unknown error'}`);
     }
   };
 
   const searchStudents = async (query) => {
+    setSearchQuery(query);
     if (!query.trim()) {
       setSearchResults([]);
       return;
@@ -85,7 +104,8 @@ const Guard = () => {
       setLoading(true);
       const response = await studentAPI.searchStudents({ query });
       setSearchResults(response.data.students || []);
-    } catch (error) {
+    } catch (err) {
+      console.error('searchStudents error', err);
       setError('Failed to search students');
     } finally {
       setLoading(false);
@@ -132,27 +152,29 @@ const Guard = () => {
           setTimeout(() => {
             setCurrentView('visits');
             resetForm();
-          }, 2000);
+          }, 1200);
         } else if (response.data.code === 'OTP_SENT') {
+          setOtpStatus('sent');
+          setError(null);
+        } else {
+          // unknown success code - still show sent
           setOtpStatus('sent');
           setError(null);
         }
       } else {
         const message = response.data.message || 'Failed to request OTP';
         const code = response.data.code;
-
         setError(message);
 
         if (code === 'OUT_OF_HOURS') {
           setOtpStatus('out_of_hours');
         }
       }
-    } catch (error) {
-      const message = error.response?.data?.message || error.message || 'Failed to request OTP';
-      const code = error.response?.data?.code;
-
+    } catch (err) {
+      console.error('handleRequestOTP error', err);
+      const message = err.response?.data?.message || err.message || 'Failed to request OTP';
+      const code = err.response?.data?.code;
       setError(message);
-
       if (code === 'OUT_OF_HOURS') {
         setOtpStatus('out_of_hours');
       }
@@ -162,6 +184,11 @@ const Guard = () => {
   };
 
   const handleVerifyOTP = async (otp) => {
+    if (!otp || otp.length < 4) {
+      setError('Enter a valid OTP');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -178,10 +205,15 @@ const Guard = () => {
         setTimeout(() => {
           setCurrentView('visits');
           resetForm();
-        }, 2000);
+        }, 1200);
+      } else {
+        const message = response.data.message || 'OTP verification failed';
+        setError(message);
+        setOtpStatus('sent');
       }
-    } catch (error) {
-      const message = error.response?.data?.message || 'OTP verification failed';
+    } catch (err) {
+      console.error('handleVerifyOTP error', err);
+      const message = err.response?.data?.message || 'OTP verification failed';
       setError(message);
       setOtpStatus('sent');
     } finally {
@@ -207,13 +239,16 @@ const Guard = () => {
       if (response.data.success) {
         setOtpStatus('override_requested');
         setError(null);
-
+        // optionally show message
         setTimeout(() => {
-          alert(response.data.message);
-        }, 300);
+          alert(response.data.message || 'Override requested');
+        }, 200);
+      } else {
+        setError(response.data.message || 'Override request failed');
       }
-    } catch (error) {
-      const message = error.response?.data?.message || 'Override request failed';
+    } catch (err) {
+      console.error('handleRequestOverride error', err);
+      const message = err.response?.data?.message || 'Override request failed';
       setError(message);
       setOtpStatus('out_of_hours');
     } finally {
@@ -223,15 +258,24 @@ const Guard = () => {
 
   const handleCheckout = async (visitId) => {
     try {
+      setLoading(true);
       await otpAPI.checkout(visitId, { guardId: user._id || user.id });
-      loadActiveVisits();
-    } catch (error) {
-      setError(error.response?.data?.message || 'Failed to checkout visitor');
+      await loadActiveVisits();
+    } catch (err) {
+      console.error('handleCheckout error', err);
+      setError(err.response?.data?.message || 'Failed to checkout visitor');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDirectOTPVerify = async (e) => {
     e.preventDefault();
+    if (!otpVerificationData.visitorPhone || otpVerificationData.otp.length !== 6) {
+      setError('Enter phone and 6-digit OTP');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -248,10 +292,13 @@ const Guard = () => {
         setTimeout(() => {
           setCurrentView('visits');
           setOtpVerificationData({ visitorPhone: '', otp: '' });
-        }, 2000);
+        }, 1200);
+      } else {
+        setError(response.data.message || 'OTP verification failed');
       }
-    } catch (error) {
-      const message = error.response?.data?.message || 'OTP verification failed';
+    } catch (err) {
+      console.error('handleDirectOTPVerify error', err);
+      const message = err.response?.data?.message || 'OTP verification failed';
       setError(message);
     } finally {
       setLoading(false);
@@ -266,58 +313,154 @@ const Guard = () => {
     setError(null);
   };
 
+  // --- UI ---
   if (!user) {
     return (
-      <div className="guard-loading">
-        <div className="guard-spinner"></div>
-        <p>Loading guard information...</p>
+      <div style={{
+        minHeight: '240px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'column',
+        gap: '12px'
+      }}>
+        <div style={{
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          border: '4px solid rgba(102,126,234,0.2)',
+          borderTopColor: '#667eea',
+          animation: 'spin 1s linear infinite'
+        }} />
+        <p style={{ color: '#666' }}>Loading guard information...</p>
+
+        <style>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     );
   }
 
   return (
-    <div className="guard-container">
+    <div style={{
+      minHeight: '100vh',
+      background: '#f5f7fb',
+      padding: '22px',
+      boxSizing: 'border-box'
+    }}>
       {/* Header */}
-      <header className="guard-header">
-        <div className="guard-header-content">
-          <div className="guard-header-title">
-            <h1>🛡️ Security Guard</h1>
-            <p>Welcome, {user?.name || 'Guard'}</p>
+      <div style={{
+        background: 'white',
+        borderRadius: '12px',
+        padding: '20px',
+        marginBottom: '18px',
+        border: '1px solid #e6e9f2'
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '12px',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <Shield size={26} color="#667eea" />
+            <div>
+              <h1 style={{ margin: 0, fontSize: '20px', color: '#111', fontWeight: '700' }}>
+                Visitor Management
+              </h1>
+              <h4>Security Portal</h4>
+            </div>
           </div>
-          <div className="guard-header-buttons">
+
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'center',
+            flexWrap: 'nowrap',
+            overflowX: 'auto'
+          }}>
             <button
               onClick={() => setCurrentView('search')}
-              className={`guard-btn ${currentView === 'search' ? 'guard-btn-active' : 'guard-btn-inactive'}`}
+              style={headerButtonStyle(currentView === 'search')}
             >
               New Visitor
             </button>
+
             <button
               onClick={() => setCurrentView('verify')}
-              className={`guard-btn ${currentView === 'verify' ? 'guard-btn-active' : 'guard-btn-inactive'}`}
+              style={headerButtonStyle(currentView === 'verify')}
             >
               Verify OTP
             </button>
+
             <button
               onClick={() => setCurrentView('visits')}
-              className={`guard-btn ${currentView === 'visits' ? 'guard-btn-active' : 'guard-btn-inactive'} guard-btn-relative`}
+              style={{ ...headerButtonStyle(currentView === 'visits'), position: 'relative' }}
             >
               Active Visits
               {activeVisits.length > 0 && (
-                <span className="guard-badge">{activeVisits.length}</span>
+                <span style={{
+                  position: 'absolute',
+                  top: '-8px',
+                  right: '-8px',
+                  background: '#ff4757',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '20px',
+                  height: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  boxShadow: '0 2px 8px rgba(255,71,87,0.25)'
+                }}>{activeVisits.length}</span>
               )}
             </button>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="guard-main">
-        {error && (
-          <div className="guard-error">
-            {error}
-            <button onClick={() => setError(null)} className="guard-error-close">×</button>
+      {/* Error */}
+      {error && (
+        <div style={{
+          background: '#fff5f5',
+          borderRadius: 10,
+          padding: '12px 14px',
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          border: '1px solid #ffd2d2'
+        }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flex: 1 }}>
+            <AlertCircle size={18} color="#f56565" />
+            <div style={{ color: '#c53030', fontSize: 14 }}>{error}</div>
           </div>
-        )}
+          <button onClick={() => setError(null)} style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            color: '#c53030',
+            padding: 6
+          }}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
+      {/* Main card */}
+      <div style={{
+        background: 'white',
+        borderRadius: 12,
+        border: '1px solid #e6e9f2',
+        padding: 22
+      }}>
         {currentView === 'search' && (
           <SearchView
             searchQuery={searchQuery}
@@ -338,65 +481,13 @@ const Guard = () => {
         )}
 
         {currentView === 'verify' && (
-          <div className="row">
-            <div className="col-12">
-              <div className="card">
-                <div className="card-header">
-                  <h5 className="mb-0">
-                    Verify Student OTP
-                  </h5>
-                </div>
-                <div className="card-body">
-                  <form onSubmit={handleDirectOTPVerify}>
-                    <div className="mb-3">
-                      <label className="form-label">Visitor Phone Number</label>
-                      <input
-                        type="tel"
-                        className="form-control"
-                        value={otpVerificationData.visitorPhone}
-                        onChange={(e) => setOtpVerificationData({
-                          ...otpVerificationData,
-                          visitorPhone: e.target.value
-                        })}
-                        required
-                        placeholder="Enter visitor's phone number"
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">OTP</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={otpVerificationData.otp}
-                        onChange={(e) => setOtpVerificationData({
-                          ...otpVerificationData,
-                          otp: e.target.value
-                        })}
-                        required
-                        maxLength={6}
-                        placeholder="Enter 6-digit OTP"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      className="btn btn-primary"
-                      disabled={loading || 
-                        !otpVerificationData.visitorPhone || 
-                        otpVerificationData.otp.length !== 6}
-                    >
-                      {loading ? 'Verifying...' : 'Verify OTP'}
-                    </button>
-                  </form>
-
-                  {otpStatus === 'verified' && (
-                    <div className="alert alert-success mt-3">
-                      ✅ OTP verified successfully. Entry granted.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <VerifyView
+            otpVerificationData={otpVerificationData}
+            setOtpVerificationData={setOtpVerificationData}
+            onVerify={handleDirectOTPVerify}
+            loading={loading}
+            otpStatus={otpStatus}
+          />
         )}
 
         {currentView === 'visits' && (
@@ -406,151 +497,211 @@ const Guard = () => {
             onRefresh={loadActiveVisits}
           />
         )}
-      </main>
+      </div>
     </div>
   );
 };
 
-// Search and OTP Request View
-const SearchView = ({ 
-  searchQuery, setSearchQuery, searchResults, onSearch, onStudentSelect, 
-  selectedStudent, visitorData, setVisitorData, otpStatus, onRequestOTP, 
-  onVerifyOTP, onRequestOverride, onReset, loading
+// helper style for header buttons
+const headerButtonStyle = (active) => ({
+  padding: '8px 16px',
+  borderRadius: 10,
+  border: active ? 'none' : '1px solid #e6e9f2',
+  background: active ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'white',
+  color: active ? 'white' : '#666',
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: 'pointer',
+  boxShadow: active ? '0 6px 18px rgba(102,126,234,0.18)' : 'none'
+});
+
+// --- SearchView component (UI + OTP request) ---
+const SearchView = ({
+  searchQuery, setSearchQuery, searchResults, onSearch, onStudentSelect,
+  selectedStudent, visitorData, setVisitorData, otpStatus, onRequestOTP, onVerifyOTP,
+  onRequestOverride, onReset, loading
 }) => {
   const [otpInput, setOtpInput] = useState('');
 
+  useEffect(() => {
+    setOtpInput('');
+  }, [otpStatus]);
+
   return (
-    <div className="guard-grid">
-      {/* Student Search Card */}
-      <div className="guard-card">
-        <h2>Find Student</h2>
-        
-        <div className="guard-search-section">
-          <label className="guard-label">Search by name, room, or roll number</label>
-          <input
-            type="text"
-            className="guard-input"
-            placeholder="Enter student name..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              onSearch(e.target.value);
-            }}
-          />
-        </div>
+    <div>
+      <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 12px 0', color: '#111' }}>
+        New Visitor Entry
+      </h2>
 
-        {searchResults.length > 0 && (
-          <div className="guard-results">
-            {searchResults.map((student) => (
-              <button
-                key={student._id}
-                onClick={() => onStudentSelect(student)}
-                className="guard-result-item"
-              >
-                <div className="guard-result-name">{student.name}</div>
-                <div className="guard-result-info">
-                  Room {student.room} • {student.rollNumber}
-                </div>
-              </button>
-            ))}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+        gap: 20
+      }}>
+        {/* Student Search Card */}
+        <div style={{...cardStyle, boxShadow: '0 4px 12px rgba(0,0,0,0.08)'}}>
+          <h3 style={cardTitleStyle}><Search size={18} /> Find Student</h3>
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={labelStyle}>Search by name, room, or roll number</label>
+            <input
+              type="text"
+              placeholder="Enter student name..."
+              value={searchQuery}
+              onChange={(e) => onSearch(e.target.value)}
+              style={inputStyle}
+              onFocus={(e) => e.target.style.borderColor = '#667eea'}
+              onBlur={(e) => e.target.style.borderColor = '#e6e9f2'}
+            />
           </div>
-        )}
 
-        {selectedStudent && (
-          <div className="guard-selected-student">
-            <div>
-              <div className="guard-selected-name">{selectedStudent.name}</div>
-              <div className="guard-selected-info">
-                Room {selectedStudent.room} • {selectedStudent.rollNumber}
-              </div>
+          {searchResults.length > 0 && (
+            <div style={{
+              maxHeight: 220,
+              overflowY: 'auto',
+              background: '#fafcff',
+              borderRadius: 8,
+              border: '1px solid #e6eefc'
+            }}>
+              {searchResults.map((student) => (
+                <button
+                  key={student._id}
+                  onClick={() => onStudentSelect(student)}
+                  style={searchResultStyle}
+                >
+                  <div style={{ fontWeight: 700, color: '#111', marginBottom: 4 }}>{student.name}</div>
+                  <div style={{ fontSize: 13, color: '#666' }}>Room {student.room} • {student.rollNumber}</div>
+                </button>
+              ))}
             </div>
-            <button onClick={onReset} className="guard-change-btn">Change</button>
+          )}
+
+          {selectedStudent && (
+            <div style={{
+              background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+              borderRadius: 8,
+              padding: 12,
+              border: '2px solid #6ee7b7',
+              marginTop: 12,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              boxShadow: '0 4px 16px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255,255,255,0.5)'
+            }}>
+              <div>
+                <div style={{ fontWeight: 800, color: '#111' }}>{selectedStudent.name}</div>
+                <div style={{ fontSize: 13, color: '#666' }}>Room {selectedStudent.room} • {selectedStudent.rollNumber}</div>
+              </div>
+              <button onClick={onReset} style={{
+                padding: '8px 12px',
+                background: 'white',
+                border: '1px solid #e6e9f2',
+                borderRadius: 8,
+                color: '#667eea',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}>Change</button>
+            </div>
+          )}
+        </div>
+
+        {/* Visitor Details Card */}
+        <div style={cardStyle}>
+          <h3 style={cardTitleStyle}>Visitor Details</h3>
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={labelStyle}>Visitor Name *</label>
+            <input
+              type="text"
+              placeholder="Enter visitor's full name"
+              value={visitorData.name}
+              onChange={(e) => setVisitorData({ ...visitorData, name: e.target.value })}
+              style={inputStyle}
+            />
           </div>
-        )}
-      </div>
 
-      {/* Visitor Details Card */}
-      <div className="guard-card">
-        <h2>Visitor Details</h2>
-        
-        <div className="guard-form-group">
-          <label className="guard-label">Visitor Name *</label>
-          <input
-            type="text"
-            className="guard-input"
-            placeholder="Enter visitor's full name"
-            value={visitorData.name}
-            onChange={(e) => setVisitorData({...visitorData, name: e.target.value})}
-          />
-        </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={labelStyle}>Phone Number *</label>
+            <input
+              type="tel"
+              placeholder="Enter visitor's phone number"
+              value={visitorData.phone}
+              onChange={(e) => setVisitorData({ ...visitorData, phone: e.target.value })}
+              style={inputStyle}
+            />
+          </div>
 
-        <div className="guard-form-group">
-          <label className="guard-label">Phone Number *</label>
-          <input
-            type="tel"
-            className="guard-input"
-            placeholder="Enter visitor's phone number"
-            value={visitorData.phone}
-            onChange={(e) => setVisitorData({...visitorData, phone: e.target.value})}
-          />
-        </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={labelStyle}>Purpose of Visit *</label>
+            <input
+              type="text"
+              placeholder="e.g., Family visit, Academic discussion"
+              value={visitorData.purpose}
+              onChange={(e) => setVisitorData({ ...visitorData, purpose: e.target.value })}
+              style={inputStyle}
+            />
+          </div>
 
-        <div className="guard-form-group">
-          <label className="guard-label">Purpose of Visit *</label>
-          <input
-            type="text"
-            className="guard-input"
-            placeholder="e.g., Family visit, Academic discussion"
-            value={visitorData.purpose}
-            onChange={(e) => setVisitorData({...visitorData, purpose: e.target.value})}
-          />
-        </div>
+          <div style={{ marginBottom: 18 }}>
+            <label style={labelStyle}>Group Size</label>
+            <select
+              value={visitorData.groupSize}
+              onChange={(e) => setVisitorData({ ...visitorData, groupSize: e.target.value })}
+              style={{ ...inputStyle, padding: '10px 12px' }}
+            >
+              {[1, 2, 3, 4, 5].map(size => (
+                <option key={size} value={size}>{size} {size === 1 ? 'person' : 'people'}</option>
+              ))}
+            </select>
+          </div>
 
-        <div className="guard-form-group">
-          <label className="guard-label">Group Size</label>
-          <select
-            className="guard-input guard-select"
-            value={visitorData.groupSize}
-            onChange={(e) => setVisitorData({...visitorData, groupSize: e.target.value})}
-          >
-            {[1,2,3,4,5].map(size => (
-              <option key={size} value={size}>
-                {size} {size === 1 ? 'person' : 'people'}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* OTP Actions */}
-        <div className="guard-otp-section">
+          {/* OTP Actions */}
           {!otpStatus && (
             <button
               onClick={onRequestOTP}
               disabled={loading || !selectedStudent || !visitorData.name || !visitorData.phone || !visitorData.purpose}
-              className="guard-btn-primary guard-btn-full"
+              style={{
+                width: '100%',
+                padding: 12,
+                borderRadius: 10,
+                border: 'none',
+                background: (loading || !selectedStudent || !visitorData.name || !visitorData.phone || !visitorData.purpose)
+                  ? '#e6e9f2' : 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)',
+                color: 'white',
+                fontWeight: 800,
+                fontSize: 15,
+                cursor: (loading || !selectedStudent || !visitorData.name || !visitorData.phone || !visitorData.purpose) ? 'not-allowed' : 'pointer',
+                boxShadow: '0 6px 18px rgba(102,126,234,0.12)'
+              }}
             >
               {loading ? 'Processing...' : 'Request OTP'}
             </button>
           )}
 
           {otpStatus === 'sent' && (
-            <div className="guard-otp-form">
-              <div className="guard-alert guard-alert-warning">
-                OTP sent to student. Please ask for the OTP from the visitor.
-              </div>
-              <div className="guard-otp-input-group">
+            <div>
+              <div style={infoBoxStyle('warning', '#fffbeb', '#f59e0b')}>OTP sent to student. Please ask visitor for the OTP.</div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
                 <input
                   type="text"
-                  className="guard-input"
                   placeholder="Enter 6-digit OTP"
                   value={otpInput}
                   onChange={(e) => setOtpInput(e.target.value)}
                   maxLength={6}
+                  style={{ ...inputStyle, flex: 1 }}
                 />
                 <button
                   onClick={() => onVerifyOTP(otpInput)}
                   disabled={loading || otpInput.length !== 6}
-                  className="guard-btn-success"
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: 10,
+                    border: 'none',
+                    background: (loading || otpInput.length !== 6) ? '#e6e9f2' : '#10b981',
+                    color: 'white',
+                    fontWeight: 800,
+                    cursor: (loading || otpInput.length !== 6) ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   Verify
                 </button>
@@ -559,20 +710,27 @@ const SearchView = ({
           )}
 
           {otpStatus === 'verified' && (
-            <div className="guard-alert guard-alert-success">
-              ✅ Entry approved! Visitor can proceed.
-            </div>
+            <div style={infoBoxStyle('success', '#d1f2eb', '#059669')}>✅ Entry approved! Visitor can proceed.</div>
           )}
 
           {otpStatus === 'out_of_hours' && (
             <div>
-              <div className="guard-alert guard-alert-warning">
-                This is an out-of-hours visit request. Warden approval required.
-              </div>
+              <div style={infoBoxStyle('warning', '#fffbeb', '#f59e0b')}>This is an out-of-hours visit request. Warden approval required.</div>
               <button
                 onClick={onRequestOverride}
                 disabled={loading}
-                className="guard-btn-warning guard-btn-full"
+                style={{
+                  width: '100%',
+                  padding: 12,
+                  borderRadius: 10,
+                  border: 'none',
+                  background: loading ? '#e6e9f2' : '#fbbf24',
+                  color: '#92400e',
+                  fontWeight: 800,
+                  fontSize: 15,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  marginTop: 10
+                }}
               >
                 Request Warden Override
               </button>
@@ -580,9 +738,7 @@ const SearchView = ({
           )}
 
           {otpStatus === 'override_requested' && (
-            <div className="guard-alert guard-alert-info">
-              ✅ Override request sent to admin. Please wait for approval.
-            </div>
+            <div style={infoBoxStyle('info', '#eef2ff', '#3b82f6')}>✅ Override request sent to admin. Please wait for approval.</div>
           )}
         </div>
       </div>
@@ -590,66 +746,183 @@ const SearchView = ({
   );
 };
 
-// Active Visits View
+// --- VerifyView component ---
+const VerifyView = ({ otpVerificationData, setOtpVerificationData, onVerify, loading, otpStatus }) => {
+  return (
+    <div style={{ maxWidth: 560, margin: '0 auto' }}>
+      <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 8px 0', color: '#111' }}>Verify Student OTP</h2>
+      <p style={{ margin: '0 0 18px 0', color: '#666' }}>Enter visitor's phone and OTP to grant entry</p>
+
+      <form onSubmit={onVerify}>
+        <div style={{ marginBottom: 14 }}>
+          <label style={labelStyle}>Visitor Phone Number</label>
+          <input
+            type="tel"
+            value={otpVerificationData.visitorPhone}
+            onChange={(e) => setOtpVerificationData({ ...otpVerificationData, visitorPhone: e.target.value })}
+            required
+            placeholder="Enter visitor's phone number"
+            style={{ ...inputStyle, border: '2px solid #e0e7ff', borderRadius: 10, padding: '12px 14px' }}
+            onFocus={(e) => e.target.style.borderColor = '#667eea'}
+            onBlur={(e) => e.target.style.borderColor = '#e0e7ff'}
+          />
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={labelStyle}>OTP</label>
+          <input
+            type="text"
+            value={otpVerificationData.otp}
+            onChange={(e) => setOtpVerificationData({ ...otpVerificationData, otp: e.target.value })}
+            required
+            maxLength={6}
+            placeholder="Enter 6-digit OTP"
+            style={{
+              ...inputStyle,
+              border: '2px solid #e0e7ff',
+              borderRadius: 10,
+              padding: '12px 14px',
+              letterSpacing: 6,
+              fontWeight: 800,
+              fontSize: 16
+            }}
+            onFocus={(e) => e.target.style.borderColor = '#667eea'}
+            onBlur={(e) => e.target.style.borderColor = '#e0e7ff'}
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading || !otpVerificationData.visitorPhone || otpVerificationData.otp.length !== 6}
+          style={{
+            width: '100%',
+            padding: 14,
+            borderRadius: 12,
+            border: 'none',
+            background: (loading || !otpVerificationData.visitorPhone || otpVerificationData.otp.length !== 6)
+              ? '#ddd' : 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)',
+            color: 'white',
+            fontWeight: 900,
+            fontSize: 15,
+            cursor: (loading || !otpVerificationData.visitorPhone || otpVerificationData.otp.length !== 6) ? 'not-allowed' : 'pointer'
+          }}
+        >
+          {loading ? 'Verifying...' : 'Verify OTP'}
+        </button>
+      </form>
+
+      {otpStatus === 'verified' && (
+        <div style={{
+          background: '#d1f2eb',
+          border: '2px solid #10b981',
+          borderRadius: 10,
+          padding: 12,
+          marginTop: 16,
+          fontWeight: 700,
+          color: '#065f46',
+          textAlign: 'center'
+        }}>
+          ✅ OTP verified successfully. Entry granted.
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- VisitsView component ---
 const VisitsView = ({ activeVisits, onCheckout, onRefresh }) => {
   return (
-    <div className="guard-visits-container">
-      <div className="guard-visits-header">
-        <h2>Active Visits</h2>
-        <button onClick={onRefresh} className="guard-btn-secondary">
-          Refresh
-        </button>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+        <div>
+          <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: '#111' }}>Active Visits</h2>
+          <p style={{ margin: '6px 0 0 0', color: '#666' }}>{activeVisits.length} visitor{activeVisits.length !== 1 ? 's' : ''} currently on campus</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onRefresh} style={{
+            padding: '8px 12px',
+            borderRadius: 10,
+            border: '1px solid #e6e9f2',
+            background: 'white',
+            cursor: 'pointer',
+            fontWeight: 700
+          }}>Refresh</button>
+        </div>
       </div>
 
       {activeVisits.length === 0 ? (
-        <div className="guard-empty-state">
-          <div className="guard-empty-icon">👥</div>
-          <p className="guard-empty-title">No active visits</p>
-          <p className="guard-empty-subtitle">All visitors have been checked out</p>
+        <div style={{
+          textAlign: 'center',
+          padding: '48px 20px',
+          background: '#f8fbff',
+          borderRadius: 12,
+          border: '1px dashed #e6eefc'
+        }}>
+          <div style={{ fontSize: 56, opacity: 0.5, marginBottom: 12 }}>👥</div>
+          <h3 style={{ fontSize: 20, margin: '0 0 8px 0', color: '#111' }}>No Active Visits</h3>
+          <p style={{ margin: 0, color: '#666' }}>All visitors have been checked out</p>
         </div>
       ) : (
-        <div className="guard-visits-grid">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gap: 18
+        }}>
           {activeVisits.map((visit) => (
-            <div key={visit._id} className="guard-visit-card">
-              <div className="guard-visit-header">
+            <div key={visit._id} style={{
+              background: 'linear-gradient(135deg,#fbfdff 0%,#ffffff 100%)',
+              borderRadius: 14,
+              padding: 18,
+              border: '1px solid #eef6ff',
+              boxShadow: '0 6px 18px rgba(15,23,42,0.04)',
+              transition: 'transform 0.18s ease, box-shadow 0.18s ease'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                 <div>
-                  <h3>{visit.visitorName}</h3>
-                  <p>{visit.visitorPhone}</p>
+                  <h3 style={{ margin: 0, fontSize: 18, color: '#111' }}>{visit.visitorName}</h3>
+                  <p style={{ margin: '6px 0 0 0', color: '#666' }}>{visit.visitorPhone}</p>
                 </div>
                 <button
                   onClick={() => onCheckout(visit._id)}
-                  className="guard-btn-danger"
+                  style={{
+                    padding: '8px 12px',
+                    background: '#ff4757',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    fontWeight: 800
+                  }}
                 >
                   Check Out
                 </button>
               </div>
 
-              <div className="guard-visit-info">
-                <div className="guard-visit-row">
-                  <span className="guard-visit-label">Visiting:</span>
-                  <span>{visit.studentId?.name}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <infoRow label="Visiting:" value={visit.studentId?.name} />
+                <infoRow label="Room:" value={visit.studentId?.room} />
+                <infoRow label="Purpose:" value={visit.purpose} />
+                <infoRow label="Entry Time:" value={formatTime(visit.entryAt)} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ color: '#888', fontSize: 13, fontWeight: 600 }}>Duration:</div>
+                  <div style={{ fontWeight: 800, color: '#667eea', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Clock size={14} /> {Math.floor((new Date() - new Date(visit.entryAt)) / 60000)} mins
+                  </div>
                 </div>
-                <div className="guard-visit-row">
-                  <span className="guard-visit-label">Room:</span>
-                  <span>{visit.studentId?.room}</span>
-                </div>
-                <div className="guard-visit-row">
-                  <span className="guard-visit-label">Purpose:</span>
-                  <span>{visit.purpose}</span>
-                </div>
-                <div className="guard-visit-row">
-                  <span className="guard-visit-label">Entry Time:</span>
-                  <span>{new Date(visit.entryAt).toLocaleTimeString()}</span>
-                </div>
-                <div className="guard-visit-row">
-                  <span className="guard-visit-label">Duration:</span>
-                  <span>{Math.floor((new Date() - new Date(visit.entryAt)) / 60000)} minutes</span>
-                </div>
-                <div className="guard-visit-row">
-                  <span className="guard-visit-label">Method:</span>
-                  <span className={`guard-badge-method guard-badge-${visit.method}`}>
-                    {visit.method.toUpperCase()}
-                  </span>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ color: '#888', fontSize: 13, fontWeight: 600 }}>Method:</div>
+                  <div style={{
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    fontSize: 12,
+                    background: visit.method === 'otp' ? '#d1f2eb' : '#fff3cd',
+                    color: visit.method === 'otp' ? '#059669' : '#92400e'
+                  }}>
+                    {visit.method || 'N/A'}
+                  </div>
                 </div>
               </div>
             </div>
@@ -659,5 +932,104 @@ const VisitsView = ({ activeVisits, onCheckout, onRefresh }) => {
     </div>
   );
 };
+
+// small reusable helpers/styles
+const cardStyle = {
+  background: 'white',
+  borderRadius: 12,
+  padding: 18,
+  border: '1px solid #eef4ff',
+  boxSizing: 'border-box'
+};
+
+const cardTitleStyle = {
+  fontSize: 15,
+  fontWeight: 800,
+  marginBottom: 12,
+  display: 'flex',
+  gap: 8,
+  alignItems: 'center',
+  color: '#111'
+};
+
+const labelStyle = {
+  display: 'block',
+  fontSize: 13,
+  fontWeight: 700,
+  color: '#444',
+  marginBottom: 6
+};
+
+const inputStyle = {
+  width: '100%',
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '1px solid #e6e9f2',
+  fontSize: 14,
+  boxSizing: 'border-box',
+  outline: 'none'
+};
+
+const searchResultStyle = {
+  width: '100%',
+  padding: 12,
+  border: 'none',
+  background: 'white',
+  textAlign: 'left',
+  cursor: 'pointer',
+  borderBottom: '1px solid #f3f6fb'
+};
+
+const infoBoxStyle = (type, bg, color) => ({
+  background: bg,
+  border: `1px solid ${shadeColor(color, -8)}`,
+  borderRadius: 10,
+  padding: 12,
+  fontSize: 14,
+  color: color,
+  fontWeight: 700,
+  textAlign: 'center',
+  marginTop: 8
+});
+
+// small row component for visits
+const infoRow = ({ label, value }) => (
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ color: '#888', fontSize: 13, fontWeight: 600 }}>{label}</div>
+    <div style={{ fontSize: 14, color: '#111', fontWeight: 700 }}>{value || '—'}</div>
+  </div>
+);
+
+// format time with locale en-IN fallback
+const formatTime = (time) => {
+  try {
+    return new Date(time).toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  } catch {
+    return time;
+  }
+};
+
+// small color utility
+function shadeColor(hex, percent) {
+  // accepts '#rrggbb' and returns shaded version
+  try {
+    let c = hex.replace('#', '');
+    if (c.length === 3) c = c.split('').map(ch => ch + ch).join('');
+    const num = parseInt(c, 16);
+    let r = (num >> 16) + percent;
+    let g = ((num >> 8) & 0x00FF) + percent;
+    let b = (num & 0x0000FF) + percent;
+    r = Math.max(Math.min(255, r), 0);
+    g = Math.max(Math.min(255, g), 0);
+    b = Math.max(Math.min(255, b), 0);
+    return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
+  } catch {
+    return hex;
+  }
+}
 
 export default Guard;
