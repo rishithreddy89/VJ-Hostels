@@ -4,11 +4,48 @@ import img2 from "../../assets/2.jpg";
 import img3 from "../../assets/3.jpg";
 import img4 from "../../assets/4.png";
 import logo from "../../assets/vnrvjiet-logo.png";
+import AnnouncementBanner from "./AnnouncementBanner";
 import "../../styles/homepage.css";
 
 const HomePage = () => {
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768);
+  const [bannerDismissed, setBannerDismissed] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   return (
     <div className="home-page" style={{ margin: 0, padding: 0 }}>
+      {/* Mobile Announcement Banner - Below Navbar */}
+      {isMobile && !bannerDismissed && (
+        <div style={{ 
+          position: 'fixed', 
+          top: '90px', 
+          left: '50%', 
+          transform: 'translateX(-50%)', 
+          width: '90%', 
+          maxWidth: '600px',
+          zIndex: 40
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '9999px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            overflow: 'hidden',
+            padding: '0.7rem 1rem',
+            minHeight: '85px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <AnnouncementBanner onDismiss={() => setBannerDismissed(true)} />
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section
         className="hero-section-custom"
@@ -23,7 +60,7 @@ const HomePage = () => {
           justifyContent: "center",
           position: "relative",
           margin: 0,
-          padding: 0,
+          padding: "140px 20px 40px 20px",
           marginTop: "-1px",
         }}
       >
@@ -34,13 +71,15 @@ const HomePage = () => {
             zIndex: 2,
             textAlign: "center",
             color: "white",
-            padding: "50px 40px",
-            maxWidth: "600px",
+            padding: "30px 30px 35px 30px",
+            maxWidth: "520px",
+            width: "90%",
+            marginTop: "80px",
             backgroundColor: "rgba(255, 255, 255, 0.15)",
             backdropFilter: "blur(20px)",
             WebkitBackdropFilter: "blur(20px)",
             border: "1px solid rgba(255, 255, 255, 0.3)",
-            borderRadius: "25px",
+            borderRadius: "20px",
           }}
         >
           {/* Logo + Text */}
@@ -49,8 +88,8 @@ const HomePage = () => {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              marginBottom: "30px",
-              gap: "20px",
+              marginBottom: "20px",
+              gap: "15px",
               flexWrap: "wrap",
             }}
           >
@@ -58,8 +97,8 @@ const HomePage = () => {
               src={logo}
               alt="VNR VJIET Logo"
               style={{
-                width: "90px",
-                height: "90px",
+                width: "70px",
+                height: "70px",
               }}
             />
             <div style={{ textAlign: "center" }}>
@@ -68,7 +107,7 @@ const HomePage = () => {
                 style={{
                   margin: 0,
                   fontWeight: "bold",
-                  fontSize: "3rem",
+                  fontSize: "2.2rem",
                   color: "#fff",
                 }}
               >
@@ -77,8 +116,8 @@ const HomePage = () => {
               <h4
                 className="hero-subtitle-custom"
                 style={{
-                  margin: "5px 0 0 0",
-                  fontSize: "1.8rem",
+                  margin: "3px 0 0 0",
+                  fontSize: "1.4rem",
                   color: "#fff",
                   fontWeight: "600",
                 }}
@@ -92,14 +131,17 @@ const HomePage = () => {
           <p
             className="hero-text-custom"
             style={{
-              fontSize: "1.1rem",
-              margin: "0 auto",
+              fontSize: "1rem",
+              margin: "0 auto 18px auto",
               color: "#fff",
-              lineHeight: "1.6",
+              lineHeight: "1.5",
             }}
           >
             Your home away from home – Safe, Comfortable, and Supportive.
           </p>
+
+          {/* Announcement Banner - Desktop Only */}
+          {!isMobile && <AnnouncementBanner />}
         </div>
       </section>
 
@@ -286,8 +328,10 @@ const HomePage = () => {
             className="contact-grid"
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+              gridTemplateColumns: "repeat(2, 1fr)",
               gap: "25px",
+              maxWidth: "800px",
+              margin: "0 auto",
             }}
           >
             {[

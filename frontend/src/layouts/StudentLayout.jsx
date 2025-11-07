@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Menu, X, LogOut } from 'lucide-react'
 import Navbar from '../components/student/Navbar'
-import AnnouncementBanner from '../components/student/AnnouncementBanner'
 import useCurrentUser from '../hooks/student/useCurrentUser'
 import { useAuthStore } from '../store/authStore'
 import '../styles/student/custom.css'
@@ -15,9 +14,6 @@ function StudentLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
   const [scrolled, setScrolled] = useState(false)
-
-  const isAnnouncementsPage = location.pathname.includes('/announcements')
-  const isStudentArea = location.pathname.startsWith('/student')
 
   const handleLogout = () => {
     // Clear state immediately
@@ -245,9 +241,6 @@ function StudentLayout() {
           </aside>
         </>
       )}
-
-  {/* Announcement Banner - Show across student area except the announcements page */}
-  {isStudentArea && !isAnnouncementsPage && <AnnouncementBanner />}
 
       {/* Page Content */}
       <main

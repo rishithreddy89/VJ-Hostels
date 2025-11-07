@@ -173,10 +173,15 @@ function setupResponseTime(app) {
   app.use((req, res, next) => {
     const start = Date.now();
     
-    res.on('finish', () => {
+    // Override res.end to set header before response is sent
+    const originalEnd = res.end;
+    res.end = function(...args) {
       const duration = Date.now() - start;
-      res.setHeader('X-Response-Time', `${duration}ms`);
-    });
+      if (!res.headersSent) {
+        res.setHeader('X-Response-Time', `${duration}ms`);
+      }
+      originalEnd.apply(this, args);
+    };
     
     next();
   });

@@ -166,10 +166,10 @@
     font-size: 1.8rem !important;
   }
 
-  /* Contact grid mobile */
-  .home-page .contact-grid {
-    grid-template-columns: 1fr !important;
-    gap: 1rem !important;
+  /* Contact grid mobile - keep 2x2 layout */
+  .contact-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 15px !important;
   }
 }
 

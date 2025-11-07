@@ -3,20 +3,19 @@ import { useForm, Controller } from 'react-hook-form';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import useCurrentUser from '../../hooks/student/useCurrentUser';
-import { Calendar, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import './OutpassDateTimePicker.css';
 
 // Modern DateTime Picker Component
 function DateTimePicker({ selectedDateTime, onConfirm, onClose, minDate }) {
-    // Initialize with minDate if provided and no selectedDateTime, or ensure selectedDateTime is after minDate
-    const initialDate = selectedDateTime || (minDate ? new Date(minDate.getTime() + 60000) : new Date()); // Add 1 minute to minDate
+    const initialDate = selectedDateTime || (minDate ? new Date(minDate.getTime() + 60000) : new Date());
     const [currentDate, setCurrentDate] = useState(initialDate);
     const [viewDate, setViewDate] = useState(new Date(initialDate));
     const [selectedHour, setSelectedHour] = useState(initialDate.getHours() % 12 || 12);
     const [selectedMinute, setSelectedMinute] = useState(initialDate.getMinutes());
     const [period, setPeriod] = useState(initialDate.getHours() >= 12 ? 'PM' : 'AM');
+    const [activeTab, setActiveTab] = useState('date');
 
-    // Calendar logic
     const monthNames = ["January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"];
     const dayNames = ["S", "M", "T", "W", "T", "F", "S"];
@@ -30,17 +29,14 @@ function DateTimePicker({ selectedDateTime, onConfirm, onClose, minDate }) {
         
         const days = [];
         
-        // Previous month days
         for (let i = firstDay - 1; i >= 0; i--) {
             days.push({ day: daysInPrevMonth - i, isCurrentMonth: false });
         }
         
-        // Current month days
         for (let i = 1; i <= daysInMonth; i++) {
             days.push({ day: i, isCurrentMonth: true });
         }
         
-        // Next month days
         const remainingDays = 42 - days.length;
         for (let i = 1; i <= remainingDays; i++) {
             days.push({ day: i, isCurrentMonth: false });
@@ -72,13 +68,14 @@ function DateTimePicker({ selectedDateTime, onConfirm, onClose, minDate }) {
             newDate.setHours(period === 'PM' && selectedHour !== 12 ? selectedHour + 12 : selectedHour === 12 && period === 'AM' ? 0 : selectedHour);
             newDate.setMinutes(selectedMinute);
             
-            // Validate against minDate
             if (minDate && newDate < minDate) {
                 alert('Please select a date and time after the out time.');
                 return;
             }
             
             setCurrentDate(newDate);
+            // Automatically switch to time tab after date selection
+            setTimeout(() => setActiveTab('time'), 150);
         }
     };
 
@@ -94,7 +91,6 @@ function DateTimePicker({ selectedDateTime, onConfirm, onClose, minDate }) {
         const actualHour = period === 'PM' && hour !== 12 ? hour + 12 : hour === 12 && period === 'AM' ? 0 : hour;
         newDate.setHours(actualHour);
         
-        // Validate against minDate
         if (minDate && newDate < minDate) {
             alert('Please select a time after the out time.');
             return;
@@ -108,7 +104,6 @@ function DateTimePicker({ selectedDateTime, onConfirm, onClose, minDate }) {
         const newDate = new Date(currentDate);
         newDate.setMinutes(minute);
         
-        // Validate against minDate
         if (minDate && newDate < minDate) {
             alert('Please select a time after the out time.');
             return;
@@ -127,7 +122,6 @@ function DateTimePicker({ selectedDateTime, onConfirm, onClose, minDate }) {
             newDate.setHours(hours - 12);
         }
         
-        // Validate against minDate
         if (minDate && newDate < minDate) {
             alert('Please select a time after the out time.');
             return;
@@ -137,7 +131,6 @@ function DateTimePicker({ selectedDateTime, onConfirm, onClose, minDate }) {
     };
 
     const handleConfirm = () => {
-        // Final validation before confirming
         if (minDate && currentDate < minDate) {
             alert('In time must be after out time.');
             return;
@@ -147,54 +140,71 @@ function DateTimePicker({ selectedDateTime, onConfirm, onClose, minDate }) {
 
     const days = getDaysInMonth(viewDate);
     const hours = Array.from({ length: 12 }, (_, i) => i + 1);
-    const minutes = Array.from({ length: 60 }, (_, i) => i);
 
     return (
-        <>
-            {/* Backdrop */}
-            <div
-                onClick={onClose}
-                style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.5)',
-                    zIndex: 9998
-                }}
-            />
-
-            {/* Picker Container */}
-            <div style={{
+        <div style={{
                 position: 'fixed',
                 top: '50%',
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
                 background: 'white',
-                borderRadius: '16px',
+                borderRadius: '20px',
                 overflow: 'hidden',
-                maxWidth: '90vw',
-                maxHeight: '90vh',
+                width: 'calc(100vw - 32px)',
+                maxWidth: '400px',
+                maxHeight: '85vh',
                 zIndex: 9999,
-                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+                boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1)',
+                border: '1px solid rgba(0, 0, 0, 0.08)',
                 display: 'flex',
                 flexDirection: 'column'
             }}>
-                {/* Header with selected date */}
-                <div className="datetime-header" style={{
+                {/* Compact Header */}
+                <div style={{
                     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                     color: 'white',
                     padding: '20px',
-                    textAlign: 'center'
+                    position: 'relative'
                 }}>
-                    <div className="datetime-header-day" style={{ fontSize: '14px', opacity: 0.9, marginBottom: '8px' }}>
-                        {dayNames[currentDate.getDay()]}
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onClose();
+                        }}
+                        style={{
+                            position: 'absolute',
+                            top: '16px',
+                            right: '16px',
+                            background: 'rgba(255, 255, 255, 0.2)',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            color: 'white',
+                            transition: 'background 0.2s',
+                            zIndex: 10
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                    >
+                        <X size={18} />
+                    </button>
+                    
+                    <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>
+                        Select In Time
                     </div>
-                    <div className="datetime-header-date" style={{ fontSize: '32px', fontWeight: 'bold' }}>
-                        {monthNames[currentDate.getMonth()].slice(0, 3)} {currentDate.getDate()}
+                    <div style={{ fontSize: '24px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Calendar size={20} />
+                        {currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </div>
-                    <div className="datetime-header-time" style={{ fontSize: '24px', marginTop: '8px', fontWeight: '500' }}>
+                    <div style={{ fontSize: '20px', marginTop: '4px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Clock size={18} />
                         {currentDate.toLocaleTimeString('en-US', { 
                             hour: '2-digit', 
                             minute: '2-digit',
@@ -203,28 +213,80 @@ function DateTimePicker({ selectedDateTime, onConfirm, onClose, minDate }) {
                     </div>
                 </div>
 
+                {/* Tab Navigation */}
+                <div style={{
+                    display: 'flex',
+                    borderBottom: '2px solid #e0e0e0',
+                    background: '#fafafa'
+                }}>
+                    <button
+                        onClick={() => setActiveTab('date')}
+                        style={{
+                            flex: 1,
+                            padding: '12px',
+                            background: activeTab === 'date' ? 'white' : 'transparent',
+                            border: 'none',
+                            borderBottom: activeTab === 'date' ? '3px solid #667eea' : '3px solid transparent',
+                            color: activeTab === 'date' ? '#667eea' : '#666',
+                            fontWeight: activeTab === 'date' ? 'bold' : 'normal',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                        }}
+                    >
+                        <Calendar size={16} />
+                        Date
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('time')}
+                        style={{
+                            flex: 1,
+                            padding: '12px',
+                            background: activeTab === 'time' ? 'white' : 'transparent',
+                            border: 'none',
+                            borderBottom: activeTab === 'time' ? '3px solid #667eea' : '3px solid transparent',
+                            color: activeTab === 'time' ? '#667eea' : '#666',
+                            fontWeight: activeTab === 'time' ? 'bold' : 'normal',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                        }}
+                    >
+                        <Clock size={16} />
+                        Time
+                    </button>
+                </div>
+
                 <div style={{ 
                     overflowY: 'auto',
-                    maxHeight: 'calc(90vh - 180px)'
+                    flex: 1,
+                    padding: '0'
                 }}>
                     {/* Min Date Info */}
                     {minDate && (
-                        <div className="out-time-banner" style={{
-                            padding: '12px 20px',
-                            background: '#e3f2fd',
-                            borderBottom: '1px solid #90caf9',
+                        <div style={{
+                            padding: '10px 16px',
+                            background: '#f0f4ff',
+                            borderBottom: '1px solid #667eea',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            fontSize: '13px',
-                            color: '#1565c0'
+                            fontSize: '12px',
+                            color: '#667eea'
                         }}>
-                            <Clock size={16} />
+                            <Clock size={14} />
                             <span>
-                                <strong>Out Time:</strong> {minDate.toLocaleString('en-IN', { 
+                                <strong>After:</strong> {minDate.toLocaleString('en-IN', { 
                                     day: '2-digit',
                                     month: 'short',
-                                    year: 'numeric',
                                     hour: '2-digit',
                                     minute: '2-digit',
                                     hour12: true
@@ -234,370 +296,413 @@ function DateTimePicker({ selectedDateTime, onConfirm, onClose, minDate }) {
                     )}
                     
                     {/* Calendar Section */}
-                    <div className="calendar-section" style={{ padding: '20px' }}>
-                        {/* Month Navigation */}
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: '20px'
-                        }}>
-                            <button
-                                onClick={() => changeMonth(-1)}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    padding: '8px',
-                                    borderRadius: '50%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}>
-                                <ChevronLeft size={24} />
-                            </button>
-                            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>
-                                {monthNames[viewDate.getMonth()]} {viewDate.getFullYear()}
-                            </h3>
-                            <button
-                                onClick={() => changeMonth(1)}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    padding: '8px',
-                                    borderRadius: '50%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}>
-                                <ChevronRight size={24} />
-                            </button>
-                        </div>
-
-                        {/* Day Names */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(7, 1fr)',
-                            gap: '8px',
-                            marginBottom: '8px'
-                        }}>
-                            {dayNames.map((day, i) => (
-                                <div key={i} style={{
-                                    textAlign: 'center',
-                                    fontSize: '12px',
-                                    fontWeight: 'bold',
-                                    color: '#666'
-                                }}>
-                                    {day}
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Calendar Days */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(7, 1fr)',
-                            gap: '8px'
-                        }}>
-                            {days.map((day, i) => {
-                                const isSelected = isDateSelected(day);
-                                const isDisabled = isDateDisabled(day) || !day.isCurrentMonth;
-                                return (
-                                    <button
-                                        key={i}
-                                        onClick={() => handleDateSelect(day)}
-                                        disabled={isDisabled}
-                                        style={{
-                                            padding: '10px',
-                                            border: 'none',
-                                            borderRadius: '50%',
-                                            background: isSelected ? '#1976d2' : 'transparent',
-                                            color: isSelected ? 'white' : isDisabled ? '#ccc' : '#333',
-                                            cursor: isDisabled ? 'not-allowed' : 'pointer',
-                                            fontSize: '14px',
-                                            fontWeight: isSelected ? 'bold' : 'normal',
-                                            opacity: isDisabled ? 0.5 : 1,
-                                            transition: 'all 0.2s',
-                                            outline: isSelected ? '2px solid #ffa726' : 'none'
-                                        }}>
-                                        {day.day}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Time Section */}
-                    <div className="time-section" style={{
-                        padding: '20px',
-                        background: '#f5f5f5',
-                        borderTop: '1px solid #e0e0e0'
-                    }}>
-                        {/* AM/PM Toggle */}
-                        <div className="period-toggle" style={{
-                            display: 'flex',
-                            justifyContent: 'center',
-                            gap: '10px',
-                            marginBottom: '20px'
-                        }}>
-                            <button
-                                onClick={() => handlePeriodChange('AM')}
-                                className="period-button"
-                                style={{
-                                    padding: '10px 30px',
-                                    border: 'none',
-                                    borderRadius: '50px',
-                                    background: period === 'AM' ? '#1976d2' : '#e0e0e0',
-                                    color: period === 'AM' ? 'white' : '#666',
-                                    cursor: 'pointer',
-                                    fontSize: '16px',
-                                    fontWeight: 'bold',
-                                    transition: 'all 0.3s'
-                                }}>
-                                AM
-                            </button>
-                            <button
-                                onClick={() => handlePeriodChange('PM')}
-                                className="period-button"
-                                style={{
-                                    padding: '10px 30px',
-                                    border: 'none',
-                                    borderRadius: '50px',
-                                    background: period === 'PM' ? '#1976d2' : '#e0e0e0',
-                                    color: period === 'PM' ? 'white' : '#666',
-                                    cursor: 'pointer',
-                                    fontSize: '16px',
-                                    fontWeight: 'bold',
-                                    transition: 'all 0.3s'
-                                }}>
-                                PM
-                            </button>
-                        </div>
-
-                        {/* Clock Face */}
-                        <div className="clock-face" style={{
-                            width: '260px',
-                            height: '260px',
-                            borderRadius: '50%',
-                            background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
-                            position: 'relative',
-                            margin: '0 auto 20px',
-                            boxShadow: 'inset 0 0 20px rgba(0, 0, 0, 0.05)'
-                        }}>
-                            {/* Hour markers */}
-                            {hours.map((hour) => {
-                                const angle = ((hour % 12) * 30 - 90) * (Math.PI / 180);
-                                const radius = 90;
-                                const x = radius * Math.cos(angle);
-                                const y = radius * Math.sin(angle);
-                                const isSelected = selectedHour === hour;
-
-                                return (
-                                    <button
-                                        key={hour}
-                                        onClick={() => handleHourChange(hour)}
-                                        className="clock-hour-button"
-                                        style={{
-                                            position: 'absolute',
-                                            left: `calc(50% + ${x}px)`,
-                                            top: `calc(50% + ${y}px)`,
-                                            transform: 'translate(-50%, -50%)',
-                                            width: '36px',
-                                            height: '36px',
-                                            borderRadius: '50%',
-                                            border: 'none',
-                                            background: isSelected ? '#1976d2' : 'transparent',
-                                            color: isSelected ? 'white' : '#333',
-                                            fontSize: '14px',
-                                            fontWeight: isSelected ? 'bold' : 'normal',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s',
-                                            zIndex: 2
-                                        }}>
-                                        {hour}
-                                    </button>
-                                );
-                            })}
-
-                            {/* Clock hands */}
+                    {activeTab === 'date' && (
+                        <div style={{ padding: '12px' }}>
                             <div style={{
-                                position: 'absolute',
-                                width: '4px',
-                                height: '70px',
-                                background: '#1976d2',
-                                bottom: '50%',
-                                left: '50%',
-                                transformOrigin: 'bottom center',
-                                transform: `translateX(-50%) rotate(${(selectedHour % 12) * 30}deg)`,
-                                borderRadius: '10px',
-                                zIndex: 1
-                            }} />
-
-                            {/* Center dot */}
-                            <div style={{
-                                position: 'absolute',
-                                width: '12px',
-                                height: '12px',
-                                background: '#1976d2',
-                                borderRadius: '50%',
-                                top: '50%',
-                                left: '50%',
-                                transform: 'translate(-50%, -50%)',
-                                zIndex: 3,
-                                border: '2px solid white'
-                            }} />
-
-                            {/* Minute display */}
-                            <div style={{
-                                position: 'absolute',
-                                bottom: '40px',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                background: 'white',
-                                padding: '8px 16px',
-                                borderRadius: '20px',
-                                fontSize: '16px',
-                                fontWeight: 'bold',
-                                color: '#1976d2',
-                                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-                                zIndex: 4
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: '16px'
                             }}>
-                                :{selectedMinute.toString().padStart(2, '0')}
+                                <button
+                                    onClick={() => changeMonth(-1)}
+                                    style={{
+                                        background: '#f5f5f5',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        padding: '8px',
+                                        borderRadius: '8px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'background 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = '#e0e0e0'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                                >
+                                    <ChevronLeft size={20} />
+                                </button>
+                                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#333' }}>
+                                    {monthNames[viewDate.getMonth()]} {viewDate.getFullYear()}
+                                </h3>
+                                <button
+                                    onClick={() => changeMonth(1)}
+                                    style={{
+                                        background: '#f5f5f5',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        padding: '8px',
+                                        borderRadius: '8px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'background 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = '#e0e0e0'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                                >
+                                    <ChevronRight size={20} />
+                                </button>
+                            </div>
+
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(7, 1fr)',
+                                gap: '4px',
+                                marginBottom: '4px'
+                            }}>
+                                {dayNames.map((day, i) => (
+                                    <div key={i} style={{
+                                        textAlign: 'center',
+                                        fontSize: '11px',
+                                        fontWeight: 'bold',
+                                        color: '#999',
+                                        padding: '4px 0'
+                                    }}>
+                                        {day}
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(7, 1fr)',
+                                gap: '4px'
+                            }}>
+                                {days.map((day, i) => {
+                                    const isSelected = isDateSelected(day);
+                                    const isDisabled = isDateDisabled(day) || !day.isCurrentMonth;
+                                    return (
+                                        <button
+                                            key={i}
+                                            onClick={() => handleDateSelect(day)}
+                                            disabled={isDisabled}
+                                            style={{
+                                                padding: '10px 0',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                background: isSelected ? '#667eea' : 'transparent',
+                                                color: isSelected ? 'white' : isDisabled ? '#ddd' : '#333',
+                                                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                                fontSize: '13px',
+                                                fontWeight: isSelected ? 'bold' : 'normal',
+                                                opacity: isDisabled ? 0.4 : 1,
+                                                transition: 'all 0.2s',
+                                                width: '100%'
+                                            }}
+                                        >
+                                            {day.day}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
+                    )}
 
-                        {/* Minute selector */}
-                        <div className="minute-controls" style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '10px'
-                        }}>
-                            <button
-                                onClick={() => handleMinuteChange(Math.max(0, selectedMinute - 1))}
-                                className="minute-button"
-                                style={{
-                                    padding: '8px 16px',
+                    {/* Time Section */}
+                    {activeTab === 'time' && (
+                        <div style={{ padding: '16px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            {/* AM/PM Toggle */}
+                            <div style={{
+                                display: 'flex',
+                                gap: '8px',
+                                marginBottom: '16px',
+                                background: '#f5f5f5',
+                                padding: '4px',
+                                borderRadius: '12px',
+                                width: '180px'
+                            }}>
+                                <button
+                                    onClick={() => handlePeriodChange('AM')}
+                                    style={{
+                                        flex: 1,
+                                        padding: '10px',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        background: period === 'AM' ? 'white' : 'transparent',
+                                        color: period === 'AM' ? '#667eea' : '#666',
+                                        cursor: 'pointer',
+                                        fontSize: '14px',
+                                        fontWeight: 'bold',
+                                        transition: 'all 0.2s',
+                                        boxShadow: period === 'AM' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                                    }}
+                                >
+                                    AM
+                                </button>
+                                <button
+                                    onClick={() => handlePeriodChange('PM')}
+                                    style={{
+                                        flex: 1,
+                                        padding: '10px',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        background: period === 'PM' ? 'white' : 'transparent',
+                                        color: period === 'PM' ? '#667eea' : '#666',
+                                        cursor: 'pointer',
+                                        fontSize: '14px',
+                                        fontWeight: 'bold',
+                                        transition: 'all 0.2s',
+                                        boxShadow: period === 'PM' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                                    }}
+                                >
+                                    PM
+                                </button>
+                            </div>
+
+                            {/* Clock Face */}
+                            <div style={{
+                                position: 'relative',
+                                width: 'min(240px, 65vw)',
+                                height: 'min(240px, 65vw)',
+                                borderRadius: '50%',
+                                background: 'linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%)',
+                                border: '3px solid #e0e0e0',
+                                marginBottom: '16px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                            }}>
+                                {/* Center dot */}
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '50%',
+                                    left: '50%',
+                                    transform: 'translate(-50%, -50%)',
+                                    width: '12px',
+                                    height: '12px',
+                                    borderRadius: '50%',
                                     background: '#667eea',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    fontWeight: 'bold'
-                                }}>
-                                -1
-                            </button>
-                            <button
-                                onClick={() => handleMinuteChange(Math.max(0, selectedMinute - 5))}
-                                className="minute-button"
-                                style={{
-                                    padding: '8px 16px',
-                                    background: '#667eea',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    fontWeight: 'bold'
-                                }}>
-                                -5
-                            </button>
-                            <input
-                                type="number"
-                                min="0"
-                                max="59"
-                                value={selectedMinute}
-                                onChange={(e) => handleMinuteChange(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
-                                className="minute-input"
-                                style={{
-                                    width: '60px',
+                                    zIndex: 10
+                                }} />
+                                
+                                {/* Hour numbers in circle */}
+                                {hours.map((hour) => {
+                                    const angle = (hour * 30 - 90) * (Math.PI / 180);
+                                    const clockSize = Math.min(240, window.innerWidth * 0.65);
+                                    const radius = clockSize * 0.39;
+                                    const x = Math.cos(angle) * radius;
+                                    const y = Math.sin(angle) * radius;
+                                    
+                                    return (
+                                        <button
+                                            key={hour}
+                                            onClick={() => handleHourChange(hour)}
+                                            style={{
+                                                position: 'absolute',
+                                                top: '50%',
+                                                left: '50%',
+                                                transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+                                                width: '36px',
+                                                height: '36px',
+                                                borderRadius: '50%',
+                                                border: 'none',
+                                                background: selectedHour === hour ? '#667eea' : 'transparent',
+                                                color: selectedHour === hour ? 'white' : '#333',
+                                                fontSize: '16px',
+                                                fontWeight: 'bold',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                zIndex: 5
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (selectedHour !== hour) {
+                                                    e.currentTarget.style.background = '#f0f4ff';
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (selectedHour !== hour) {
+                                                    e.currentTarget.style.background = 'transparent';
+                                                }
+                                            }}
+                                        >
+                                            {hour}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Minute Selector */}
+                            <div style={{ width: '100%', maxWidth: '100%', padding: '0 8px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#666', display: 'block', marginBottom: '8px', textAlign: 'center' }}>
+                                    Minutes
+                                </label>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    background: 'white',
                                     padding: '8px',
-                                    textAlign: 'center',
-                                    border: '2px solid #1976d2',
-                                    borderRadius: '8px',
-                                    fontSize: '16px',
-                                    fontWeight: 'bold'
-                                }}
-                            />
-                            <button
-                                onClick={() => handleMinuteChange(Math.min(59, selectedMinute + 5))}
-                                className="minute-button"
-                                style={{
-                                    padding: '8px 16px',
-                                    background: '#667eea',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    fontWeight: 'bold'
+                                    borderRadius: '12px',
+                                    border: '2px solid #e0e0e0',
+                                    flexWrap: 'wrap',
+                                    justifyContent: 'center'
                                 }}>
-                                +5
-                            </button>
-                            <button
-                                onClick={() => handleMinuteChange(Math.min(59, selectedMinute + 1))}
-                                className="minute-button"
-                                style={{
-                                    padding: '8px 16px',
-                                    background: '#667eea',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    fontWeight: 'bold'
-                                }}>
-                                +1
-                            </button>
+                                    <button
+                                        onClick={() => handleMinuteChange(Math.max(0, selectedMinute - 5))}
+                                        style={{
+                                            padding: '8px 12px',
+                                            background: '#f5f5f5',
+                                            color: '#667eea',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            fontWeight: 'bold',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = '#667eea';
+                                            e.currentTarget.style.color = 'white';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = '#f5f5f5';
+                                            e.currentTarget.style.color = '#667eea';
+                                        }}
+                                    >
+                                        -5
+                                    </button>
+                                    <button
+                                        onClick={() => handleMinuteChange(Math.max(0, selectedMinute - 1))}
+                                        style={{
+                                            padding: '8px 12px',
+                                            background: '#f5f5f5',
+                                            color: '#667eea',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            fontWeight: 'bold',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = '#667eea';
+                                            e.currentTarget.style.color = 'white';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = '#f5f5f5';
+                                            e.currentTarget.style.color = '#667eea';
+                                        }}
+                                    >
+                                        -1
+                                    </button>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="59"
+                                        value={selectedMinute}
+                                        onChange={(e) => handleMinuteChange(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
+                                        style={{
+                                            flex: 1,
+                                            minWidth: '60px',
+                                            padding: '12px',
+                                            textAlign: 'center',
+                                            border: '2px solid #667eea',
+                                            borderRadius: '10px',
+                                            fontSize: '18px',
+                                            fontWeight: 'bold',
+                                            background: '#f0f4ff',
+                                            color: '#667eea'
+                                        }}
+                                    />
+                                    <button
+                                        onClick={() => handleMinuteChange(Math.min(59, selectedMinute + 1))}
+                                        style={{
+                                            padding: '8px 12px',
+                                            background: '#f5f5f5',
+                                            color: '#667eea',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            fontWeight: 'bold',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = '#667eea';
+                                            e.currentTarget.style.color = 'white';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = '#f5f5f5';
+                                            e.currentTarget.style.color = '#667eea';
+                                        }}
+                                    >
+                                        +1
+                                    </button>
+                                    <button
+                                        onClick={() => handleMinuteChange(Math.min(59, selectedMinute + 5))}
+                                        style={{
+                                            padding: '8px 12px',
+                                            background: '#f5f5f5',
+                                            color: '#667eea',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            fontWeight: 'bold',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = '#667eea';
+                                            e.currentTarget.style.color = 'white';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = '#f5f5f5';
+                                            e.currentTarget.style.color = '#667eea';
+                                        }}
+                                    >
+                                        +5
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Footer Actions */}
-                <div className="action-buttons" style={{
-                    padding: '16px 20px',
-                    background: '#f5f5f5',
+                <div style={{
+                    padding: '10px 16px',
+                    background: '#fafafa',
                     display: 'flex',
                     justifyContent: 'flex-end',
-                    gap: '10px',
-                    borderTop: '1px solid #e0e0e0'
+                    gap: '8px',
+                    borderTop: '1px solid #e0e0e0',
+                    flexShrink: 0
                 }}>
                     <button
                         onClick={onClose}
-                        className="action-button"
                         style={{
-                            padding: '10px 24px',
-                            background: 'transparent',
+                            padding: '8px 16px',
+                            background: 'white',
                             color: '#666',
                             border: '1px solid #ddd',
-                            borderRadius: '8px',
+                            borderRadius: '10px',
                             cursor: 'pointer',
                             fontSize: '14px',
-                            fontWeight: 'bold'
-                        }}>
+                            fontWeight: '600'
+                        }}
+                    >
                         Cancel
                     </button>
                     <button
                         onClick={handleConfirm}
-                        className="action-button"
                         style={{
-                            padding: '10px 24px',
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            padding: '8px 20px',
+                            background: 'linear-gradient(135deg, #667eea 50%, #764ba2 100%)',
                             color: 'white',
                             border: 'none',
-                            borderRadius: '8px',
+                            borderRadius: '10px',
                             cursor: 'pointer',
                             fontSize: '14px',
                             fontWeight: 'bold',
-                            boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)'
-                        }}>
+                            boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                        }}
+                    >
                         Confirm
                     </button>
                 </div>
             </div>
-        </>
     );
 }
 
@@ -612,16 +717,13 @@ function Outpass() {
     const [calculatedType, setCalculatedType] = useState('');
     const [showInTimePicker, setShowInTimePicker] = useState(false);
 
-    // Watch outTime and inTime to calculate duration
     const outTime = watch('outTime');
     const inTime = watch('inTime');
 
-    // Set current time as default out time
     useEffect(() => {
         setValue('outTime', new Date());
     }, [setValue]);
 
-    // Calculate outpass type based on duration
     useEffect(() => {
         if (outTime && inTime) {
             const outDate = new Date(outTime);
@@ -745,13 +847,11 @@ function Outpass() {
                 return;
             }
 
-            // Validate inTime is selected
             if (!data.inTime) {
                 alert('Please select an in time.');
                 return;
             }
 
-            // Validate inTime is after outTime
             const outDateTime = new Date(data.outTime);
             const inDateTime = new Date(data.inTime);
             
@@ -774,10 +874,9 @@ function Outpass() {
             if (payload.outTime instanceof Date) payload.outTime = payload.outTime.toISOString();
             if (payload.inTime instanceof Date) payload.inTime = payload.inTime.toISOString();
 
-            const response = await axios.post(`${import.meta.env.VITE_SERVER_URL}/student-api/apply-outpass`, payload);
-            alert(response.data.message || 'Outpass request submitted successfully!');
+            await axios.post(`${import.meta.env.VITE_SERVER_URL}/student-api/apply-outpass`, payload);
             reset();
-            navigate('/home');
+            window.location.reload();
         } catch (error) {
             console.error('Error:', error);
             alert(error.response?.data?.message || 'Failed to submit outpass request');
